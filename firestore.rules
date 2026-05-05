@@ -1,0 +1,206 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - points: number (optional)
+    //   - role: string (required, 'user' or 'admin')
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: reports
+    // Document ID: {reportId}
+    // Fields:
+    //   - authorUID: string (required, immutable)
+    //   - type: string (required)
+    //   - quantity: string (required)
+    //   - location: map (required)
+    //   - comment: string (optional)
+    //   - photos: list (optional)
+    //   - voiceText: string (optional)
+    //   - status: string (required, 'pending', 'assigned' or 'resolved')
+    //   - assignedTo: string (optional)
+    //   - assignedAt: timestamp (optional)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: events
+    // Document ID: {eventId}
+    // Fields:
+    //   - title: string (required)
+    //   - location: string (required)
+    //   - date: string (required)
+    //   - time: string (required)
+    //   - description: string (optional)
+    //   - thingsToBring: list (optional)
+    //   - thingsProvided: list (optional)
+    //   - status: string (required, 'upcoming' or 'completed')
+    //   - authorUID: string (required)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: articles
+    // Document ID: {articleId}
+    // Fields:
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - authorUID: string (required)
+    //   - authorName: string (optional)
+    //   - date: string (required)
+    //   - image: string (optional)
+    //   - category: string (optional)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "bineesh.m@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'points', 'role', 'isAdmin', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
+             (!('points' in data) || (data.points is number && data.points >= 0)) &&
+             data.role in ['user', 'admin'] &&
+             (!('isAdmin' in data) || (data.isAdmin is bool)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return hasOnlyAllowedFields(['authorUID', 'type', 'quantity', 'location', 'comment', 'photos', 'voiceText', 'status', 'assignedTo', 'assignedAt', 'createdAt']) &&
+             data.authorUID is string && data.authorUID.size() > 0 &&
+             data.type is string && data.type.size() < 100 &&
+             data.quantity is string && data.quantity.size() < 50 &&
+             data.location is map && data.location.keys().hasOnly(['lat', 'lng', 'address']) &&
+             data.location.lat is number && data.location.lng is number &&
+             (!('address' in data.location) || (data.location.address is string && data.location.address.size() < 200)) &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() < 1000)) &&
+             (!('photos' in data) || (data.photos is list && data.photos.size() < 20)) &&
+             (!('voiceText' in data) || (data.voiceText is string && data.voiceText.size() < 2000)) &&
+             data.status in ['pending', 'assigned', 'resolved'] &&
+             (!('assignedTo' in data) || (data.assignedTo is string && data.assignedTo.size() < 200)) &&
+             (!('assignedAt' in data) || (data.assignedAt is timestamp)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidEvent(data) {
+      return hasOnlyAllowedFields(['title', 'location', 'date', 'time', 'description', 'thingsToBring', 'thingsProvided', 'status', 'authorUID', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.location is map && 
+             data.location.address is string && data.location.address.size() > 0 && data.location.address.size() < 500 &&
+             data.location.lat is number && data.location.lng is number &&
+             data.date is string && data.date.size() < 50 &&
+             data.time is string && data.time.size() < 50 &&
+             (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
+             (!('thingsToBring' in data) || (data.thingsToBring is list && data.thingsToBring.size() < 50)) &&
+             (!('thingsProvided' in data) || (data.thingsProvided is list && data.thingsProvided.size() < 50)) &&
+             data.status in ['upcoming', 'completed'] &&
+             data.authorUID is string &&
+             data.createdAt is timestamp &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp));
+    }
+
+    function isValidArticle(data) {
+      return hasOnlyAllowedFields(['title', 'content', 'authorUID', 'authorName', 'date', 'image', 'category', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000 &&
+             data.authorUID is string &&
+             (!('authorName' in data) || (data.authorName is string && data.authorName.size() < 100)) &&
+             data.date is string &&
+             (!('image' in data) || (data.image is string && data.image.size() < 1000)) &&
+             (!('category' in data) || (data.category is string && data.category.size() < 50)) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) &&
+                    ((isOwner(userId) && request.resource.data.role == 'user') || isAdmin()) &&
+                    uidUnchanged();
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()) &&
+                    uidNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.authorUID || isAdmin());
+      allow create: if isAuthenticated() && isValidReport(request.resource.data) &&
+                    request.resource.data.authorUID == request.auth.uid;
+      allow update: if isAuthenticated() && isValidReport(request.resource.data) &&
+                    ((request.auth.uid == resource.data.authorUID && request.resource.data.status == resource.data.status) || isAdmin()) &&
+                    request.resource.data.authorUID == resource.data.authorUID &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidEvent(request.resource.data) &&
+                    request.resource.data.authorUID == request.auth.uid;
+      allow update: if isAdmin() && isValidEvent(request.resource.data) &&
+                    request.resource.data.authorUID == resource.data.authorUID &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /articles/{articleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidArticle(request.resource.data) &&
+                    request.resource.data.authorUID == request.auth.uid;
+      allow update: if isAdmin() && isValidArticle(request.resource.data) &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+  }
+}

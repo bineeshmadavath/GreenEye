@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Green Eye application.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "points": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "isAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A litter report submitted by a user.",
+      "type": "object",
+      "properties": {
+        "authorUID": { "type": "string" },
+        "type": { "type": "string" },
+        "quantity": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "address": { "type": "string" }
+          }
+        },
+        "comment": { "type": "string" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "voiceText": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "assigned", "resolved"] },
+        "assignedTo": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUID", "type", "quantity", "location", "status", "createdAt"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "A community cleaning event.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          },
+          "required": ["address", "lat", "lng"]
+        },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "description": { "type": "string" },
+        "thingsToBring": { "type": "array", "items": { "type": "string" } },
+        "thingsProvided": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["upcoming", "completed"] },
+        "authorUID": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "location", "date", "time", "status", "createdAt"]
+    },
+    "Article": {
+      "title": "Article",
+      "description": "An informational article published by an admin.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorUID": { "type": "string" },
+        "authorName": { "type": "string" },
+        "date": { "type": "string" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "authorUID", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Stores litter reports."
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Stores community events."
+    },
+    "/articles/{articleId}": {
+      "schema": { "$ref": "#/entities/Article" },
+      "description": "Stores published articles."
+    }
+  }
+}

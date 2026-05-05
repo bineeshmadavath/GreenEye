@@ -1,0 +1,6 @@
+{
+  "name": "Green Eye",
+  "description": "A mobile application for reporting litter, earning rewards, and participating in community cleaning events.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": []
+}
