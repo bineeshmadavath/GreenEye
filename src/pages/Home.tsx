@@ -15,7 +15,7 @@ export default function Home() {
           {/* Cityscape Illustration */}
           <div className="w-full max-w-md h-48 relative flex items-end justify-center overflow-visible mt-0">
             <img 
-              src="/banner.png"
+              src="banner.png"
               alt="Green cityscape" 
               className="w-full h-full object-cover rounded-t-[32px] shadow-sm mask-image-gradient"
             />
